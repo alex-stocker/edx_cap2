@@ -20,6 +20,7 @@
 ##
 ##########################################################################
 
+# Checking libraries
 if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
 if(!require(caret)) install.packages("caret", repos = "http://cran.us.r-project.org")
 if(!require(rpart)) install.packages("data.table", repos = "http://cran.us.r-project.org")
@@ -30,6 +31,7 @@ if(!require(ggcorrplot)) install.packages("caret", repos = "http://cran.us.r-pro
 if(!require(e1071)) install.packages("data.table", repos = "http://cran.us.r-project.org")
 if(!require(data.table)) install.packages("data.table", repos = "http://cran.us.r-project.org")
 
+# Loading libraries
 library(tidyverse)
 library(caret)
 library(rpart)
@@ -38,8 +40,6 @@ library(gridExtra)
 library(rpart.plot)
 library(ggcorrplot)
 library(e1071)
-library(MASS)
-library(neuralnet)
 
 # I read the wine data from the data repository and rename some columns to avoid spaces..
 winedata <- read_delim("https://archive.ics.uci.edu/ml/machine-learning-databases/wine-quality/winequality-white.csv",delim=";")
@@ -59,12 +59,11 @@ test_index <- createDataPartition(y=winedata$quality, times = 1, p = 0.8, list =
 train_set <- winedata[test_index, ]
 test_set <- winedata[-test_index, ]
 
-# Function to compute the RMSE for vectors of ratings and their corresponding predictors
-# to rate the quality of  models
+# Function to compute the RMSE for vectors of quality ratings and their corresponding predictors
+# to rate the quality of the developed models
 RMSE <- function(true_ratings, predicted_ratings){
   sqrt(mean((true_ratings - predicted_ratings)^2))
 }
-
 
 ##########################################################################
 ##
@@ -92,9 +91,8 @@ train_set %>%
             scale_x_discrete("Wine quality (between 1 and 10; 10 is best")
 
 
-# I plot all input variables and look at their distribution using the function below to 
-# avoide code repetition.
-
+# I write a function to plot all input variables and look at their distribution using to 
+# avoid code repetition.
 plot_w <- function (input, bin){
   train_set %>% ggplot() +
     geom_histogram(aes(x={{input}}, fill=factor(quality)), binwidth={{bin}}) +
@@ -102,6 +100,7 @@ plot_w <- function (input, bin){
     labs(fill = "Wine quality")
 }
 
+# Executing the plotting function
 plot_w(fixed_acidity, 0.5)
 plot_w(volatile_acidity, 0.01)
 plot_w(citric_acid, 0.05)
@@ -144,9 +143,9 @@ grid.arrange(p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, ncol=3)
 correlationMatrix <- cor(train_set[,1:12])
 print(correlationMatrix)
 
-# I plot linear correlations as heatmap
+# I plot the linear correlations as heatmap
 ggcorrplot(correlationMatrix)
-
+# I compute correlations
 cor_mat <- cor(as.numeric(train_set$quality), train_set[,1:11], method = "spearman")
 cor_mat
 
@@ -168,109 +167,123 @@ train_set %>% ggplot() +
 ##########################################################################
 
 ## In the second part, I focus on designing the models for predicting wine quality.
+## Thereby I use the train_set. I test the models on the test_set computing accuracy
+## and RMSE score.
 
 #############################
 # Simple model: Median model
 #############################
-
 table(train_set$quality)
 median(train_set$quality)
-# I set all values to the most frequent rating
+# My simplest modek is to set all values to the most frequent rating
 quality_pred_simplemodel <- test_set$quality
 quality_pred_simplemodel[1:length(quality_pred_simplemodel)] <- median(train_set$quality)
 # Note: Data must be factor with same levels as input for confusion matrix function
+# Compute confusion matrix
 cm_simplemodel <- confusionMatrix(data = factor(quality_pred_simplemodel, levels = c(3,4,5,6,7,8,9)), 
                reference = factor(test_set$quality, levels = c(3,4,5,6,7,8,9)))
 cm_simplemodel$overall["Accuracy"] 
-
+# Compute RMSE
 RMSE_simple_model <- RMSE(test_set$quality, quality_pred_simplemodel)
 RMSE_simple_model
 
 #############################
 # Lm model
 #############################
+# I compute a linear model using all measure values as predictors and quality as outcome.
 lm_model <- lm(quality ~ ., data=train_set)
 summary(lm_model) 
 # Note: The "no information rate" score gives the score of the simple model (from above).
 quality_pred_lm <- predict(lm_model, test_set)
 quality_pred_lm <- round(quality_pred_lm) ## I need to round to the nearest value (integer)
+# Compute confusion matrix
 cm_lm_model <- confusionMatrix(data = factor(quality_pred_lm, levels = c(3,4,5,6,7,8,9)), 
                 reference = factor(test_set$quality, levels = c(3,4,5,6,7,8,9)))
 cm_lm_model$overall["Accuracy"]
-
+# Compute RMSE
 RMSE_lm <- RMSE(test_set$quality, quality_pred_lm)
 RMSE_lm
 
 #############################
 # Glm model
 #############################
+# I compute a glm model using all measure values as predictors and quality as outcome.
 glm_model <- train(quality ~ ., data=train_set, method="glm")
 summary(glm_model) 
 quality_pred_glm <- predict(glm_model, test_set) 
 quality_pred_glm <- round(quality_pred_glm)
+# Compute confusion matrix
 cm_glm_model <- confusionMatrix(data = factor(quality_pred_glm, levels = c(3,4,5,6,7,8,9)),
                 reference= factor(test_set$quality, levels = c(3,4,5,6,7,8,9)))
 cm_glm_model$overall["Accuracy"]
-
+# Compute RMSE
 RMSE_glm <- RMSE(test_set$quality, quality_pred_glm)
 RMSE_glm
 
 #############################
-# KNN
+# KNN model
 #############################
+# I compute a KNN model using all measure values as predictors and quality as outcome.
 knn_model <- train(quality ~. , data = train_set, method = "knn")
 summary(knn_model)
 quality_pred_knn <- predict(knn_model, test_set, type = "raw") 
 quality_pred_knn <- round(quality_pred_knn)
+# Compute confusion matrix
 cm_knn_model <- confusionMatrix(data = factor(quality_pred_knn, levels = c(3,4,5,6,7,8,9)),
                 reference= factor(test_set$quality, levels = c(3,4,5,6,7,8,9)))
 cm_knn_model$overall["Accuracy"]
 ggplot(knn_model, highlight = TRUE)
-
+# Compute RMSE
 RMSE_knn <- RMSE(test_set$quality, quality_pred_knn)
 RMSE_knn
 
 #############################
-# Decision tree
+# Decision tree model
 #############################
+# I compute a decision tree model using all measure values as predictors and quality as outcome.
 rpart_model <- rpart(quality ~ ., data=train_set)
 summary(rpart_model)
 quality_pred_rpart <- predict(rpart_model, test_set)
 quality_pred_rpart <- round(quality_pred_rpart)
+# Compute confusion matrix
 cm_rpart_model <- confusionMatrix(data = factor(quality_pred_rpart, levels = c(3,4,5,6,7,8,9)),
                 reference= factor(test_set$quality, levels = c(3,4,5,6,7,8,9)))
 cm_rpart_model$overall["Accuracy"]
 rpart.plot(rpart_model)
-
+# Compute RMSE
 RMSE_rpart <- RMSE(test_set$quality, quality_pred_rpart)
 RMSE_rpart
 
 #############################
-# Random forest
+# Random forest model
 #############################
+# I compute a random forest model using all measure values as predictors and quality as outcome.
 randomForest_model <- randomForest(quality ~ ., data=train_set)
 summary(randomForest_model)
 quality_pred_randomForest <- predict(randomForest_model, test_set)
 quality_pred_randomForest <- round(quality_pred_randomForest)
+# Compute confusion matrix
 cm_randomForest_model <- confusionMatrix(data = factor(quality_pred_randomForest, levels = c(3,4,5,6,7,8,9)),
                       reference= factor(test_set$quality, levels = c(3,4,5,6,7,8,9)))
 cm_randomForest_model$overall["Accuracy"]
 plot(randomForest_model)
-
+# Compute RMSE
 RMSE_randomForest <- RMSE(test_set$quality, quality_pred_randomForest)
 RMSE_randomForest
 
 #############################
-# SVM
+# SVM model
 #############################
+# I compute a SVM model using all measure values as predictors and quality as outcome.
 svm_model <- svm(quality ~ ., data=train_set)
 quality_pred_svm <- predict(svm_model, test_set)
 quality_pred_svm <- round(quality_pred_svm)
 summary(svm_model)
+# Compute confusion matrix
 cm_svm_model <- confusionMatrix(data = factor(quality_pred_svm, levels = c(3,4,5,6,7,8,9)),
                 reference= factor(test_set$quality, levels = c(3,4,5,6,7,8,9)))
 cm_svm_model$overall["Accuracy"]
-
+# Compute RMSE
 RMSE_svm <- RMSE(test_set$quality, quality_pred_svm)
 RMSE_svm
 
@@ -280,7 +293,7 @@ RMSE_svm
 ##
 ##########################################################################
 
-# I build a results dataframe for all methods based on accuracy
+# I build a results dataframe for all models evaluated based on accuracy
 acc_results <- data.frame(
   Method=c("Mean model", 
            "Lm model", 
@@ -297,9 +310,10 @@ acc_results <- data.frame(
              cm_randomForest_model$overall["Accuracy"],
              cm_svm_model$overall["Accuracy"])
              )
+# I print the table
 acc_results %>% arrange(desc(Accuracy))
 
-# I build another results dataframe for all methods based on RMSE score
+# I build another results dataframe for all models evaluated based on RMSE score
 RMSE_results <- data.frame(
   Method=c("Mean model", 
            "Lm model", 
@@ -316,14 +330,16 @@ RMSE_results <- data.frame(
              RMSE_randomForest,
              RMSE_svm)
 )
+# I print the table
 RMSE_results %>% arrange(RMSE)
 
 ## I summarise my first KPI for the model (highest accuracy)
+# highest accuracy
 acc_best <- acc_results %>% 
   arrange(desc(Accuracy)) %>% 
   filter(row_number()==1) %>% 
   pull(Accuracy)
-
+# best model
 acc_best_model <- acc_results %>% 
   arrange(desc(Accuracy)) %>% 
   filter(row_number()==1) %>% 
@@ -333,11 +349,12 @@ acc_best_model
 acc_best
 
 ## I summarise my second KPI for the model (lowest RMSE score)
+# Lowest RMSE score
 RMSE_best <- RMSE_results %>% 
   arrange(RMSE) %>% 
   filter(row_number()==1) %>% 
   pull(RMSE)
-
+# Lowest best model
 RMSE_best_model <- RMSE_results %>% 
   arrange(RMSE) %>% 
   filter(row_number()==1) %>% 
@@ -345,3 +362,8 @@ RMSE_best_model <- RMSE_results %>%
 
 RMSE_best_model 
 RMSE_best 
+
+##
+## I finally completed my script with showing the best model, highest accuracy, and lowest
+## RMSE score. 
+##
