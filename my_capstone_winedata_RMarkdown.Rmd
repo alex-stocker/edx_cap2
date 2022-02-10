@@ -1,0 +1,497 @@
+---
+title: "Report on Capstone/WineData-project 02/2022"
+author: "alex-stocker"
+date: "01.02.2022"
+output:
+  html_document:
+    toc: yes
+    toc_depth: 2
+    toc_float:
+      collapsed: no
+  pdf_document:
+    toc: yes
+    toc_depth: '2'
+---
+
+<style type="text/css">
+div.main-container {
+  max-width: 1800px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+h1.title {
+  text-align: center;
+}
+h4.author {
+  text-align: center;
+}
+h4.date { 
+  text-align: center;
+}
+
+.infobox td {
+   padding-top: 5px;
+   padding-bottom: 5px;
+}
+
+.infobox table {
+  margin-bottom: 5px;
+}
+
+.infobox thead {
+  margin-bottom: 10px;
+}
+
+</style>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,
+                      out.width = "80%",
+                      fig.align = "left")
+```
+
+# Executive Summary
+*This report summaries the activities within my second Capstone project. Therefore, I chose to work on a publicly available dataset on wine quality. This dataset includes several measured input variables such as citric acid, residual sugar or alcohol as well as one output variable, (wine) quality, rated by professional wine testers. My overall goal was to apply machine learning to predict wine quality in a best possible way based on the input variables. I will go into more detail on data exploration, visualization and model design in the following subsections of my report.*
+
+# Introduction and motivation
+As I am in general highly interested in product quality, I was looking for a dataset on product quality parameters and corresponding product quality ratings. In particular, I was interested in (subjective) human product quality ratings. 
+
+While searching for a publicly available dataset on product quality using Google, I came across two datasets on wine quality https://archive.ics.uci.edu/ml/datasets/wine+quality in the UCI Machine Learning Repository operated by the University of California, Irvine (https://uci.edu/).
+
+After carefully reading the description of the wine datasets on the corresponding dataset website, I quickly decided to work on wine quality data. While there are two datasets available in the repository related to red and white variants of the Portuguese "Vinho Verde" wine, I used the white wine dataset, only. As taught in the ML course, I created a training set and a test set and applied all analyses on the training set to avoid biases. 
+
+As a first step, I conducted an exploration of the wine dataset (the training dataset) to gain more insight into the data set structure, the variables and the distribution of the variables. I therefore created a series of different plots (including histograms,  boxplots, and correlation plots) that were very helpful to me to gain a better understanding. 
+In a second step, I created a series of models to predict wine quality based on all input variables, starting from a very simple model and ranging to more complex machine learning models. I used accuracy and RMSE as the main metrics of comparing the developed models against each other.
+Finally, I summarized the results of all predictions in a table and selected the model with the highest prediction accuracy and the lowest RMSE as the winner. 
+
+The following subsections provide a summary of all my activities related to the application of machine learning to predict wine quality based on a series of wine measurements. 
+
+```{r preparations, include=FALSE}
+
+# if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
+# if(!require(caret)) install.packages("caret", repos = "http://cran.us.r-project.org")
+# if(!require(rpart)) install.packages("data.table", repos = "http://cran.us.r-project.org")
+# if(!require(randomForest)) install.packages("caret", repos = "http://cran.us.r-project.org")
+# if(!require(gridExtra)) install.packages("data.table", repos = "http://cran.us.r-project.org")
+# if(!require(rpart.plot)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
+# if(!require(ggcorrplot)) install.packages("caret", repos = "http://cran.us.r-project.org")
+# if(!require(e1071)) install.packages("data.table", repos = "http://cran.us.r-project.org")
+# if(!require(data.table)) install.packages("data.table", repos = "http://cran.us.r-project.org")
+# if(!require(data.table)) install.packages("kableExtra", repos = "http://cran.us.r-project.org")
+
+library(tidyverse)
+library(caret)
+library(rpart)
+library(randomForest)
+library(gridExtra)
+library(rpart.plot)
+library(ggcorrplot)
+library(e1071)
+library(knitr)
+library(kableExtra)
+
+# I read the wine data from the data repository and rename some columns to avoid spaces..
+winedata <- read_delim("https://archive.ics.uci.edu/ml/machine-learning-databases/wine-quality/winequality-white.csv",delim=";")
+
+# I rename the column names to avoid working with ` `.
+winedata <- winedata %>% rename(fixed_acidity = `fixed acidity`,
+                                volatile_acidity = `volatile acidity`,
+                                citric_acid = `citric acid`,
+                                residual_sugar = `residual sugar`,
+                                free_so2 = `free sulfur dioxide`,
+                                total_so2 = `total sulfur dioxide`)
+
+# I create a train set for further analysis and model training and a test set for model testing.
+set.seed(1, sample.kind = "Rounding")
+test_index <- createDataPartition(y=winedata$quality, times = 1, p = 0.8, list = FALSE) 
+train_set <- winedata[test_index, ]
+test_set <- winedata[-test_index, ]
+
+# Function to compute the RMSE for vectors of ratings and their corresponding predictors
+# to rate the quality of  models
+RMSE <- function(true_ratings, predicted_ratings){
+  sqrt(mean((true_ratings - predicted_ratings)^2))
+}
+
+```
+
+
+# Method/analysis
+## Data exploration
+The white wine dataset includes **11 input variables that are based on objective chemical tests**, (1) fixed acidity, (2) volatile acidity, (3) citric acid, (4) residual sugar, (5) chlorides, (6) free sulfur dioxide, (7) total sulfur dioxide, (8) density, (9) pH, (10) sulphates, and (11) alcohol, and **one output variable based on subjective human ratings**, (wine) quality, a  score between 1 and 10 based on the median of at least 3 evaluations given by human wine experts.
+
+While my major goal is to predict the wine quality as rated by the human experts when wine testing from measured parameters, I want to get better insights into the dataset, first. As taught in the ML courses, I  split my dataset into training and test data and perform all analyses on the training data. My **training set** has **`r dim(train_set)[1]` observations (80%)** and my **test set** has **`r dim(test_set)[1]` observations (20%)**.
+
+The table below provides an overview on the training dataset, showing the 11 input variables and one output variable, (wine) quality.
+```{r}
+obs <- head(train_set)
+kable(obs, caption = "Observations in the wine dataset")
+# For knit in PDF
+# kable(obs, "latex", booktabs = T, caption = "Observations in the wine dataset") %>%
+# kable_styling(latex_options = c("striped", "scale_down"))
+```
+
+All variables in the dataset are numeric, including the quality variable.
+```{r}
+str(train_set)
+```
+
+The following output provides a summary of the training data set and shows basic statistical parameters such as minimum, average, and maximum values for all variables.
+```{r}
+summary (train_set)
+```
+
+Finally, I checked the dataset for missing values (NAs), but did not find any.
+```{r}
+colSums(is.na(train_set))
+```
+
+## Data visualisation
+In the next step, I applied several plots to get better insights into the dataset, including histograms. In a first step, I created a plot of the quality variable. 
+The plot shows a rather centered distribution of the wine quality variable around the mean value 6. Most experts rated the wines more in the midfield.
+```{r, out.width = '60%'}
+train_set %>% 
+            ggplot(aes(x=factor(quality))) +
+            geom_bar()+
+            scale_x_discrete("Wine quality (between 1 and 10; 10 is best")
+```
+
+The majority of experts rated the wines they have tested with 5, 6 and 7. The table below shows that there are almost no really bad wines and also comparatively few really good ones. In the training data, no one rated a wine 1, 2 or 10. 
+```{r}
+kable(table(train_set$quality), caption = "Quality of wines")
+```
+
+To gain additional insights into the data set and the distribution of the input variables, I plotted all 11 input variables as histograms. I also plotted the median as a vertical line in each histogram and filled the histograms with wine quality information. Therefore, I converted the numerical quality variable into a factor. To avoid repetition of code, I created a function for these 11 plots. 
+```{r plot histograms}
+plot_w <- function (input, bin){
+  train_set %>% ggplot() +
+    geom_histogram(aes(x={{input}}, fill=factor(quality)), binwidth={{bin}}) +
+    geom_vline(aes(xintercept=mean({{input}})),linetype="dashed") +
+    labs(fill = "Wine quality")
+}
+```
+
+The subsequent plots show the distributions of all input variables as histograms. 
+```{r, out.width = '60%'}
+plot_w(fixed_acidity, 0.5)
+plot_w(volatile_acidity, 0.01)
+plot_w(citric_acid, 0.05)
+plot_w(residual_sugar, 2)
+plot_w(chlorides, 0.005)
+plot_w(free_so2, 5)
+plot_w(total_so2, 5)
+plot_w(density, 0.001)
+plot_w(pH, 0.02)
+plot_w(sulphates, 0.02)
+plot_w(alcohol, 0.2)
+```
+
+I also created a **faceted plot** with all input variables for a quick overview. 
+```{r facet plot 1, include=FALSE}
+# Plotting input variables at once in a grid
+p1 <- train_set %>% ggplot() +
+  geom_histogram(aes(x=fixed_acidity))
+p2 <- train_set %>% ggplot() +
+  geom_histogram(aes(x=volatile_acidity))
+p3 <- train_set %>% ggplot() +
+  geom_histogram(aes(x=citric_acid))
+p4 <- train_set %>% ggplot() +
+  geom_histogram(aes(x=residual_sugar))
+p5 <- train_set %>% ggplot() +
+  geom_histogram(aes(x=chlorides))
+p6 <- train_set %>% ggplot() +
+  geom_histogram(aes(x=free_so2))
+p7 <- train_set %>% ggplot() +
+  geom_histogram(aes(x=total_so2))
+p8 <- train_set %>% ggplot() +
+  geom_histogram(aes(x=density))
+p9 <- train_set %>% ggplot() +
+  geom_histogram(aes(x=pH))
+p10 <- train_set %>% ggplot() +
+  geom_histogram(aes(x=sulphates))
+p11 <- train_set %>% ggplot() +
+  geom_histogram(aes(x=alcohol))
+```
+
+```{r facet plot 2, warning=FALSE}
+require(gridExtra)
+grid.arrange(p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, ncol=3)
+```
+
+## Correlation analysis
+In a further step of my data exploration, I wanted to examine the **(linear) correlations** between all variables. Hence, I calculated the correlation matrix and created a visualization with all correlations in the form of a heat map.
+
+The correlation matrix shows the correlations between all variables. Especially interesting for me is the correlation between the objective input variables and the subjective output variable, wine quality.
+
+```{r}
+correlationMatrix <- cor(train_set[,1:12])
+
+kable(correlationMatrix, "html", caption = "Correlation Matrix") 
+
+# For knit in PDF
+# kable(correlationMatrix, "latex", booktabs = T, caption = "Correlation Matrix") %>%
+# kable_styling(latex_options = c("striped", "scale_down"))
+
+```
+
+To get a better (visual) overview on the correlations, I decided to plot a correlation **heatmap**. Red color indicates positive correlations, while blue color indicates negative correlations. As previously said, I am especially interested, which wine property (as measured by the chemical tests) has what influence on (perceived) wine quality.
+```{r}
+# plot correlations as heatmap
+ggcorrplot(correlationMatrix)
+```
+
+In a further step, I have again clearly presented the correlations between all input variables and the wine quality. The result below suggests that **alcohol has the highest positive (linear) correlation with wine quality** and **density has the highest negative (linear) correlation with wine quality**.
+```{r}
+cor_mat <- cor(as.numeric(train_set$quality), train_set[,1:11], method = "spearman")
+cor_mat
+```
+
+The subsequent box plot shows the positive correlation between alcohol and wine quality. The higher the alcohol level in the wine, the better the (perceived) wine quality. 
+```{r, out.width = '60%'}
+# Alcohol and wine quality
+train_set %>% ggplot() +
+  geom_boxplot(aes(x=factor(quality), y=alcohol))+
+  scale_x_discrete("Wine quality")
+```
+
+The subsequent box plot shows the negative correlation between density and wine quality. The higher the density level in the wine, the lower the (perceived) wine quality.
+
+```{r, out.width = '60%'}
+# Density and wine quality
+train_set %>% ggplot() +
+  geom_boxplot(aes(x=factor(quality), y=density))+
+  scale_x_discrete("Wine quality")
+```
+
+
+# Data Modeling
+In the second part of my report, I focus on designing the models for predicting the wine quality from the input data. Thereby I apply a series of approaches and evaluate their performance. I always present the confusion matrix, the accuracy of the model, and the RMSE of the model. 
+
+## Median model
+I start with a very simple model, the median model. Thereby I set all values to predict to the most frequent wine rating, `r median(train_set$quality)`. The table below shows the correlation matrix of this model.
+```{r Median}
+#############################
+# Simple model: Median model
+quality_pred_simplemodel <- test_set$quality
+quality_pred_simplemodel[1:length(quality_pred_simplemodel)] <- median(train_set$quality)
+# data must be factor with same levels as input in confusion matrix
+cm_simplemodel <- confusionMatrix(data = factor(quality_pred_simplemodel, levels = c(3,4,5,6,7,8,9)), 
+               reference = factor(test_set$quality, levels = c(3,4,5,6,7,8,9)))
+print(cm_simplemodel$table)
+
+RMSE_simple_model <- RMSE(test_set$quality, quality_pred_simplemodel)
+```
+The accuracy of this simple median model is `r cm_simplemodel$overall["Accuracy"]`. It may be important to mention that this score is also computed as "no information rate" in the summaries of the other models that will follow in the next subsections. 
+The RMSE of the simple model is `r RMSE_simple_model`.
+
+
+## Lm model
+In the next step, I computed a linear regression model. The confusion matrix below shows that the Lm model confuses many predictions with neighbouring values. For example, the model was able to correctly predict a rating of "6" 324 times (i.e. 324 wines were predicted to have a quality of 6), but confused 6 with 5 156 times (i.e. 156 wines were predicted to have a quality of 6 but were actually only rated 5) and 6 with 7 120 times (i.e. 120 wines were predicted to have a quality of 6 but were actually rated 7). I will give an explanation for this phenomenon in my discussion section.
+```{r Lm}
+#############################
+# Lm model
+lm_model <- lm(quality ~ ., data=train_set)
+# summary(lm_model) 
+# "No information rate" score gives the score of the simplest model.
+quality_pred_lm <- predict(lm_model, test_set)
+quality_pred_lm <- round(quality_pred_lm) ## use nearest value
+cm_lm_model <- confusionMatrix(data = factor(quality_pred_lm, levels = c(3,4,5,6,7,8,9)), 
+                reference = factor(test_set$quality, levels = c(3,4,5,6,7,8,9)))
+print(cm_lm_model$table)
+
+RMSE_lm <- RMSE(test_set$quality, quality_pred_lm)
+
+```
+The accuracy of this linear regression model is `r cm_lm_model$overall["Accuracy"]`, which is not really good. However, the prediction of the model is better than when using the simple median model.
+The RMSE of the lm model is `r RMSE_lm`.
+
+## Glm model
+In the next step, I computed a generalized linear model. The prediction of this model is identical to that of the linear regression model (as I used glm to fit a linear regression model).
+```{r Glm}
+#############################
+# Glm model
+glm_model <- glm(quality ~ ., data=train_set)
+#summary(glm_model) 
+quality_pred_glm <- predict(glm_model, test_set) 
+quality_pred_glm <- round(quality_pred_glm)
+cm_glm_model <- confusionMatrix(data = factor(quality_pred_glm, levels = c(3,4,5,6,7,8,9)),
+                reference= factor(test_set$quality, levels = c(3,4,5,6,7,8,9)))
+print(cm_glm_model$table)
+
+RMSE_glm <- RMSE(test_set$quality, quality_pred_glm)
+
+```
+The accuracy of the generalized linear model is `r cm_glm_model$overall["Accuracy"]`.
+The RMSE of the glm model is `r RMSE_glm`.
+
+## Knn model
+In the next step, I computed a k-nearest neighbor model. The confusion matrix shows a similar phenomenon to the previously used models. The Knn model is not very effective at predicting the exact rating  as made by the human experts, e.g. "6" (and in many cases it predicts the immediate neighbour values, e.g. "5" or "7").
+```{r KNN_1, include=FALSE }
+#############################
+# Knn
+knn_model <- train(quality~. , data = train_set, method = "knn")
+#summary(knn_model)
+quality_pred_knn <- predict(knn_model, test_set, type = "raw") 
+quality_pred_knn <- round(quality_pred_knn)
+cm_knn_model <- confusionMatrix(data = factor(quality_pred_knn, levels = c(3,4,5,6,7,8,9)),
+                reference= factor(test_set$quality, levels = c(3,4,5,6,7,8,9)))
+
+RMSE_knn <- RMSE(test_set$quality, quality_pred_knn)
+
+```
+
+```{r KNN_2}
+print(cm_knn_model$table)
+```
+The accuracy of the k-nearest neighbor model is `r cm_knn_model$overall["Accuracy"]`.
+The RMSE of the knn model is `r RMSE_knn`.
+
+
+## Decision tree model
+In the next step, I computed a decision tree model. Also, this model is not very effective in predicting the exact human quality ratings.
+```{r DT}
+#############################
+# Decision tree
+rpart_model <- rpart(quality ~ ., data=train_set)
+#summary(rpart_model)
+quality_pred_rpart <- predict(rpart_model, test_set)
+quality_pred_rpart <- round(quality_pred_rpart)
+cm_rpart_model <- confusionMatrix(data = factor(quality_pred_rpart, levels = c(3,4,5,6,7,8,9)),
+                reference= factor(test_set$quality, levels = c(3,4,5,6,7,8,9)))
+print(cm_rpart_model$table)
+
+RMSE_rpart <- RMSE(test_set$quality, quality_pred_rpart)
+
+#rpart.plot(rpart_model)
+```
+The accuracy of the decision tree model is `r cm_rpart_model$overall["Accuracy"]`.
+The RMSE of the decision tree model is `r RMSE_rpart`.
+
+
+## Random forest
+In the next step, I computed a Random forest model. The Random forest model performs much better, than the models computed previously, as also the much higher accuracy suggests.
+```{r RF}
+#############################
+# Random forest
+randomForest_model <- randomForest(quality ~ ., data=train_set)
+#summary(randomForest_model)
+quality_pred_randomForest <- predict(randomForest_model, test_set)
+quality_pred_randomForest <- round(quality_pred_randomForest)
+cm_randomForest_model <- confusionMatrix(data = factor(quality_pred_randomForest, levels = c(3,4,5,6,7,8,9)),
+                      reference= factor(test_set$quality, levels = c(3,4,5,6,7,8,9)))
+print(cm_randomForest_model$table)
+#plot(randomForest_model)
+
+RMSE_randomForest <- RMSE(test_set$quality, quality_pred_randomForest)
+
+```
+The accuracy of the Random forest model is `r cm_randomForest_model$overall["Accuracy"]`.
+The RMSE of the Random forest model is `r RMSE_lm`.
+
+
+## SVM model
+In the next and final modeling step, I computed a Support Vector Machine model. Also, this model is not too effective in predicting the exact human quality ratings, but performs better than most of the previous models.
+```{r SVM}
+#############################
+# Svm
+svm_model <- svm(quality ~ ., data=train_set)
+quality_pred_svm <- predict(svm_model, test_set)
+quality_pred_svm <- round(quality_pred_svm)
+#summary(svm_model)
+cm_svm_model <- confusionMatrix(data = factor(quality_pred_svm, levels = c(3,4,5,6,7,8,9)),
+                reference= factor(test_set$quality, levels = c(3,4,5,6,7,8,9)))
+print(cm_svm_model$table)
+
+RMSE_svm <- RMSE(test_set$quality, quality_pred_svm)
+
+```
+The accuracy of the Support Vector Machine model is `r cm_svm_model$overall["Accuracy"]`.
+The RMSE of the Svm model is `r RMSE_lm`.
+
+
+# Results
+Finally, I merge my results and create a data frame with the results by ranking for all methods, starting with the best method. All models perform better than the simple mean model. However, the best performing model in terms of "accuracy" and RMSE is the Random Forrest model, followed by the Support Vector Machine model.
+
+```{r results}
+# I build a results dataframe for all methods based on accuracy
+acc_results <- data.frame(
+  Method=c("Mean model", 
+           "Lm model", 
+           "Glm model", 
+           "KNN model",
+           "Decision Tree model",
+           "Random Forest model",
+           "SVM model"),
+  Accuracy=c(cm_simplemodel$overall["Accuracy"], 
+             cm_glm_model$overall["Accuracy"],
+             cm_lm_model$overall["Accuracy"],
+             cm_knn_model$overall["Accuracy"],
+             cm_rpart_model$overall["Accuracy"],
+             cm_randomForest_model$overall["Accuracy"],
+             cm_svm_model$overall["Accuracy"])
+             )
+
+acc_results <- acc_results %>% arrange(desc(Accuracy))
+
+kable(acc_results, caption = "Accuracy of models")
+
+# Highest accuracy
+acc_best <- acc_results %>% 
+  arrange(desc(Accuracy)) %>% 
+  filter(row_number()==1) %>% 
+  pull(Accuracy)
+
+acc_best_model <- acc_results %>% 
+  arrange(desc(Accuracy)) %>% 
+  filter(row_number()==1) %>% 
+  pull(Method)
+
+# I build another results dataframe for all methods based on RMSE score
+RMSE_results <- data.frame(
+  Method=c("Mean model", 
+           "Lm model", 
+           "Glm model", 
+           "KNN model",
+           "Decision Tree model",
+           "Random Forest model",
+           "SVM model"),
+  RMSE=c(RMSE_simple_model, 
+             RMSE_lm,
+             RMSE_glm,
+             RMSE_knn,
+             RMSE_rpart,
+             RMSE_randomForest,
+             RMSE_svm)
+)
+RMSE_results <- RMSE_results %>% arrange(RMSE)
+
+kable(RMSE_results, caption = "RMSE of models")
+
+## Lowest RMSE 
+RMSE_best <- RMSE_results %>% 
+  arrange(RMSE) %>% 
+  filter(row_number()==1) %>% 
+  pull(RMSE)
+
+RMSE_best_model <- RMSE_results %>% 
+  arrange(RMSE) %>% 
+  filter(row_number()==1) %>% 
+  pull(Method)
+```
+
+**Key results of my project:** 
+
+The best performing model in terms of **Accuracy** is the  **`r acc_best_model`** with an accuracy of **`r acc_best`**.
+
+The best performing model in terms of **RMSE** is the  **`r RMSE_best_model`** with an RMSE of **`r RMSE_best`**.
+
+# Discussion and conclusion
+This report presents my work in the Capstone WineData project related to the development of machine learning models to predict wine quality from several input variables such as density or alcohol in a best possible way. 
+In a first step, I performed some exploratory analyses of the dataset and created a series of plots to get more insights into the distributions of the variables and the correlations of the variables with wine quality. 
+In a second step, starting from a very simple model, I developed a series of models and assessed the accuracy of each.
+In a third step, I finally identified **`r acc_best_model`** as the best model that was able to achieve an **Accuracy** of **`r acc_best`** and an **RMSE** of `r RMSE_best`. 
+
+The report, and especially the confusion matrices, shows the **inaccuracy of the machine learning models to effectively predict the subjective human ratings** of the wines. Although Random Forest offers the best prediction accuracy, the results are still far from perfect. The presented work clearly shows that human ratings can not be so exact that they can be really efficiently predicted using objective parameters. The confusion matrices show that the algorithms are very efficient in predicting a range (including neighbour ratings) but fail in predicting the exact rating. One limitation of the results is that the wine dataset is not balanced but biased towards the middle. 
+
+In future work, the wine dataset could be split into a new category scheme with fewer categories (e.g. bad, medium, excellent) and based on this, models could be developed that allow prediction for one of these categories. It can be assumed that this will be done with higher accuracy, but the unbalanced nature of the dataset will probably be only slightly affected.
