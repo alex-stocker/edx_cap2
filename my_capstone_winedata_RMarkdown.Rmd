@@ -57,12 +57,14 @@ knitr::opts_chunk$set(echo = FALSE,
 # Introduction and motivation
 As I am in general highly interested in product quality, I was looking for a dataset on product quality parameters and corresponding product quality ratings. In particular, I was interested in (subjective) human product quality ratings. 
 
-While searching for a publicly available dataset on product quality using Google, I came across two datasets on wine quality https://archive.ics.uci.edu/ml/datasets/wine+quality in the UCI Machine Learning Repository operated by the University of California, Irvine (https://uci.edu/).
+While searching for a publicly available dataset on product quality using Google, I came across two datasets on wine quality (https://archive.ics.uci.edu/ml/datasets/wine+quality) in the UCI Machine Learning Repository operated by the University of California, Irvine (https://uci.edu/).
 
 After carefully reading the description of the wine datasets on the corresponding dataset website, I quickly decided to work on wine quality data. While there are two datasets available in the repository related to red and white variants of the Portuguese "Vinho Verde" wine, I used the white wine dataset, only. As taught in the ML course, I created a training set and a test set and applied all analyses on the training set to avoid biases. 
 
 As a first step, I conducted an exploration of the wine dataset (the training dataset) to gain more insight into the data set structure, the variables and the distribution of the variables. I therefore created a series of different plots (including histograms,  boxplots, and correlation plots) that were very helpful to me to gain a better understanding. 
-In a second step, I created a series of models to predict wine quality based on all input variables, starting from a very simple model and ranging to more complex machine learning models. I used accuracy and RMSE as the main metrics of comparing the developed models against each other.
+
+In a second step, I created a series of models to predict wine quality based on all input variables, starting from a very simple model and ranging to more complex machine learning models. I computed both Accuracy and RMSE as the main performance metrics of comparing the developed machine learning models against each other. While accuracy is a usable metrics for categorical values (and classification problems), RMSE is a proper metrics for continuous values (and regression problems). So, what is the nature of my problem? In my example, the experts rate the wine quality with integers from 1 to 10. Hence, it may be treated as a categorical problem. However, I did not convert the expert rating into a factor before developing the models but left the values as numeric. I can therefore describe the variable as both, since a rating of 5.5 (as predicted by the model) should also be possible, for example. Hence, I compute both, Accuracy and RMSE (like in the MovieLens movie rating example, which can be treated similarly). 
+
 Finally, I summarized the results of all predictions in a table and selected the model with the highest prediction accuracy and the lowest RMSE as the winner. 
 
 The following subsections provide a summary of all my activities related to the application of machine learning to predict wine quality based on a series of wine measurements. 
@@ -126,10 +128,10 @@ While my major goal is to predict the wine quality as rated by the human experts
 The table below provides an overview on the training dataset, showing the 11 input variables and one output variable, (wine) quality.
 ```{r}
 obs <- head(train_set)
-kable(obs, caption = "Observations in the wine dataset")
+# kable(obs, caption = "Observations in the wine dataset")
 # For knit in PDF
-# kable(obs, "latex", booktabs = T, caption = "Observations in the wine dataset") %>%
-# kable_styling(latex_options = c("striped", "scale_down"))
+kable(obs, "latex", booktabs = T, caption = "Observations in the wine dataset") %>%
+kable_styling(latex_options = c("striped", "scale_down"))
 ```
 
 All variables in the dataset are numeric, including the quality variable.
@@ -142,14 +144,13 @@ The following output provides a summary of the training data set and shows basic
 summary (train_set)
 ```
 
-Finally, I checked the dataset for missing values (NAs), but did not find any.
+Finally, I checked the dataset for missing values (NAs), but fortunately did not find any.
 ```{r}
 colSums(is.na(train_set))
 ```
 
 ## Data visualisation
-In the next step, I applied several plots to get better insights into the dataset, including histograms. In a first step, I created a plot of the quality variable. 
-The plot shows a rather centered distribution of the wine quality variable around the mean value 6. Most experts rated the wines more in the midfield.
+In the next step, I applied several plots to get better insights into the dataset, including histograms. In a first step, I created a plot of the quality variable. The plot shows a rather centered distribution of the wine quality variable around the median value 6. Most experts rated the wines more in the midfield. The majority of experts rated the wines they have tested with 5, 6 and 7. There are almost no really bad wines and also comparatively few really good ones. In the training data, no one rated a wine 1, 2 or 10. 
 ```{r, out.width = '60%'}
 train_set %>% 
             ggplot(aes(x=factor(quality))) +
@@ -157,7 +158,6 @@ train_set %>%
             scale_x_discrete("Wine quality (between 1 and 10; 10 is best")
 ```
 
-The majority of experts rated the wines they have tested with 5, 6 and 7. The table below shows that there are almost no really bad wines and also comparatively few really good ones. In the training data, no one rated a wine 1, 2 or 10. 
 ```{r}
 kable(table(train_set$quality), caption = "Quality of wines")
 ```
@@ -227,11 +227,11 @@ The correlation matrix shows the correlations between all variables. Especially 
 ```{r}
 correlationMatrix <- cor(train_set[,1:12])
 
-kable(correlationMatrix, "html", caption = "Correlation Matrix") 
+# kable(correlationMatrix, "html", caption = "Correlation Matrix") 
 
 # For knit in PDF
-# kable(correlationMatrix, "latex", booktabs = T, caption = "Correlation Matrix") %>%
-# kable_styling(latex_options = c("striped", "scale_down"))
+kable(correlationMatrix, "latex", booktabs = T, caption = "Correlation Matrix") %>%
+kable_styling(latex_options = c("striped", "scale_down"))
 
 ```
 
@@ -269,24 +269,24 @@ train_set %>% ggplot() +
 In the second part of my report, I focus on designing the models for predicting the wine quality from the input data. Thereby I apply a series of approaches and evaluate their performance. I always present the confusion matrix, the accuracy of the model, and the RMSE of the model. 
 
 ## Median model
-I start with a very simple model, the median model. Thereby I set all values to predict to the most frequent wine rating, `r median(train_set$quality)`. The table below shows the correlation matrix of this model.
+I start with a very simple model, the median model. Thereby I set all values to predict to the median of the wine ratings, `r median(train_set$quality)`. The table below shows the correlation matrix of this model.
 ```{r Median}
 #############################
 # Simple model: Median model
 quality_pred_simplemodel <- test_set$quality
 quality_pred_simplemodel[1:length(quality_pred_simplemodel)] <- median(train_set$quality)
+RMSE_simple_model <- RMSE(test_set$quality, quality_pred_simplemodel)
+
 # data must be factor with same levels as input in confusion matrix
 cm_simplemodel <- confusionMatrix(data = factor(quality_pred_simplemodel, levels = c(3,4,5,6,7,8,9)), 
                reference = factor(test_set$quality, levels = c(3,4,5,6,7,8,9)))
 print(cm_simplemodel$table)
 
-RMSE_simple_model <- RMSE(test_set$quality, quality_pred_simplemodel)
 ```
 The accuracy of this simple median model is `r cm_simplemodel$overall["Accuracy"]`. It may be important to mention that this score is also computed as "no information rate" in the summaries of the other models that will follow in the next subsections. 
 The RMSE of the simple model is `r RMSE_simple_model`.
 
-
-## Lm model
+## Linear model
 In the next step, I computed a linear regression model. The confusion matrix below shows that the Lm model confuses many predictions with neighbouring values. For example, the model was able to correctly predict a rating of "6" 324 times (i.e. 324 wines were predicted to have a quality of 6), but confused 6 with 5 156 times (i.e. 156 wines were predicted to have a quality of 6 but were actually only rated 5) and 6 with 7 120 times (i.e. 120 wines were predicted to have a quality of 6 but were actually rated 7). I will give an explanation for this phenomenon in my discussion section.
 ```{r Lm}
 #############################
@@ -295,32 +295,33 @@ lm_model <- lm(quality ~ ., data=train_set)
 # summary(lm_model) 
 # "No information rate" score gives the score of the simplest model.
 quality_pred_lm <- predict(lm_model, test_set)
+RMSE_lm <- RMSE(test_set$quality, quality_pred_lm)
+
 quality_pred_lm <- round(quality_pred_lm) ## use nearest value
 cm_lm_model <- confusionMatrix(data = factor(quality_pred_lm, levels = c(3,4,5,6,7,8,9)), 
                 reference = factor(test_set$quality, levels = c(3,4,5,6,7,8,9)))
 print(cm_lm_model$table)
 
-RMSE_lm <- RMSE(test_set$quality, quality_pred_lm)
+
 
 ```
 The accuracy of this linear regression model is `r cm_lm_model$overall["Accuracy"]`, which is not really good. However, the prediction of the model is better than when using the simple median model.
 The RMSE of the lm model is `r RMSE_lm`.
 
-## Glm model
-In the next step, I computed a generalized linear model. The prediction of this model is identical to that of the linear regression model (as I used glm to fit a linear regression model).
+## Generalized (linear) model
+In the next step, I computed a generalized linear model. The prediction of this model is of course identical to that of the linear regression model (as I used glm to fit a linear regression model), but I wanted to execute the code, as we learned it in the course.
 ```{r Glm}
 #############################
 # Glm model
 glm_model <- glm(quality ~ ., data=train_set)
 #summary(glm_model) 
 quality_pred_glm <- predict(glm_model, test_set) 
+RMSE_glm <- RMSE(test_set$quality, quality_pred_glm)
+
 quality_pred_glm <- round(quality_pred_glm)
 cm_glm_model <- confusionMatrix(data = factor(quality_pred_glm, levels = c(3,4,5,6,7,8,9)),
                 reference= factor(test_set$quality, levels = c(3,4,5,6,7,8,9)))
 print(cm_glm_model$table)
-
-RMSE_glm <- RMSE(test_set$quality, quality_pred_glm)
-
 ```
 The accuracy of the generalized linear model is `r cm_glm_model$overall["Accuracy"]`.
 The RMSE of the glm model is `r RMSE_glm`.
@@ -333,11 +334,11 @@ In the next step, I computed a k-nearest neighbor model. The confusion matrix sh
 knn_model <- train(quality~. , data = train_set, method = "knn")
 #summary(knn_model)
 quality_pred_knn <- predict(knn_model, test_set, type = "raw") 
+RMSE_knn <- RMSE(test_set$quality, quality_pred_knn)
+
 quality_pred_knn <- round(quality_pred_knn)
 cm_knn_model <- confusionMatrix(data = factor(quality_pred_knn, levels = c(3,4,5,6,7,8,9)),
                 reference= factor(test_set$quality, levels = c(3,4,5,6,7,8,9)))
-
-RMSE_knn <- RMSE(test_set$quality, quality_pred_knn)
 
 ```
 
@@ -356,12 +357,13 @@ In the next step, I computed a decision tree model. Also, this model is not very
 rpart_model <- rpart(quality ~ ., data=train_set)
 #summary(rpart_model)
 quality_pred_rpart <- predict(rpart_model, test_set)
+RMSE_rpart <- RMSE(test_set$quality, quality_pred_rpart)
+
 quality_pred_rpart <- round(quality_pred_rpart)
 cm_rpart_model <- confusionMatrix(data = factor(quality_pred_rpart, levels = c(3,4,5,6,7,8,9)),
                 reference= factor(test_set$quality, levels = c(3,4,5,6,7,8,9)))
 print(cm_rpart_model$table)
 
-RMSE_rpart <- RMSE(test_set$quality, quality_pred_rpart)
 
 #rpart.plot(rpart_model)
 ```
@@ -377,17 +379,17 @@ In the next step, I computed a Random forest model. The Random forest model perf
 randomForest_model <- randomForest(quality ~ ., data=train_set)
 #summary(randomForest_model)
 quality_pred_randomForest <- predict(randomForest_model, test_set)
+RMSE_randomForest <- RMSE(test_set$quality, quality_pred_randomForest)
+
 quality_pred_randomForest <- round(quality_pred_randomForest)
 cm_randomForest_model <- confusionMatrix(data = factor(quality_pred_randomForest, levels = c(3,4,5,6,7,8,9)),
                       reference= factor(test_set$quality, levels = c(3,4,5,6,7,8,9)))
 print(cm_randomForest_model$table)
 #plot(randomForest_model)
 
-RMSE_randomForest <- RMSE(test_set$quality, quality_pred_randomForest)
-
 ```
 The accuracy of the Random forest model is `r cm_randomForest_model$overall["Accuracy"]`.
-The RMSE of the Random forest model is `r RMSE_lm`.
+The RMSE of the Random forest model is `r RMSE_randomForest`.
 
 
 ## SVM model
@@ -397,17 +399,16 @@ In the next and final modeling step, I computed a Support Vector Machine model. 
 # Svm
 svm_model <- svm(quality ~ ., data=train_set)
 quality_pred_svm <- predict(svm_model, test_set)
+RMSE_svm <- RMSE(test_set$quality, quality_pred_svm)
+
 quality_pred_svm <- round(quality_pred_svm)
 #summary(svm_model)
 cm_svm_model <- confusionMatrix(data = factor(quality_pred_svm, levels = c(3,4,5,6,7,8,9)),
                 reference= factor(test_set$quality, levels = c(3,4,5,6,7,8,9)))
 print(cm_svm_model$table)
-
-RMSE_svm <- RMSE(test_set$quality, quality_pred_svm)
-
 ```
 The accuracy of the Support Vector Machine model is `r cm_svm_model$overall["Accuracy"]`.
-The RMSE of the Svm model is `r RMSE_lm`.
+The RMSE of the Svm model is `r RMSE_svm`.
 
 
 # Results
@@ -416,7 +417,7 @@ Finally, I merge my results and create a data frame with the results by ranking 
 ```{r results}
 # I build a results dataframe for all methods based on accuracy
 acc_results <- data.frame(
-  Method=c("Mean model", 
+  Method=c("Median model", 
            "Lm model", 
            "Glm model", 
            "KNN model",
@@ -449,7 +450,7 @@ acc_best_model <- acc_results %>%
 
 # I build another results dataframe for all methods based on RMSE score
 RMSE_results <- data.frame(
-  Method=c("Mean model", 
+  Method=c("Median model", 
            "Lm model", 
            "Glm model", 
            "KNN model",

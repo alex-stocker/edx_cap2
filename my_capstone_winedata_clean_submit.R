@@ -175,50 +175,50 @@ train_set %>% ggplot() +
 #############################
 table(train_set$quality)
 median(train_set$quality)
-# My simplest modek is to set all values to the most frequent rating
+# My simplest modek is to set all values to the median of the quality ratings
 quality_pred_simplemodel <- test_set$quality
 quality_pred_simplemodel[1:length(quality_pred_simplemodel)] <- median(train_set$quality)
-# Note: Data must be factor with same levels as input for confusion matrix function
-# Compute confusion matrix
-cm_simplemodel <- confusionMatrix(data = factor(quality_pred_simplemodel, levels = c(3,4,5,6,7,8,9)), 
-               reference = factor(test_set$quality, levels = c(3,4,5,6,7,8,9)))
-cm_simplemodel$overall["Accuracy"] 
 # Compute RMSE
 RMSE_simple_model <- RMSE(test_set$quality, quality_pred_simplemodel)
 RMSE_simple_model
+# Compute confusion matrix
+# Note: Data must be factor with same levels as input for confusion matrix function
+cm_simplemodel <- confusionMatrix(data = factor(quality_pred_simplemodel, levels = c(3,4,5,6,7,8,9)), 
+               reference = factor(test_set$quality, levels = c(3,4,5,6,7,8,9)))
+cm_simplemodel$overall["Accuracy"] 
 
 #############################
-# Lm model
+# Linear model
 #############################
 # I compute a linear model using all measure values as predictors and quality as outcome.
 lm_model <- lm(quality ~ ., data=train_set)
 summary(lm_model) 
 # Note: The "no information rate" score gives the score of the simple model (from above).
 quality_pred_lm <- predict(lm_model, test_set)
-quality_pred_lm <- round(quality_pred_lm) ## I need to round to the nearest value (integer)
-# Compute confusion matrix
-cm_lm_model <- confusionMatrix(data = factor(quality_pred_lm, levels = c(3,4,5,6,7,8,9)), 
-                reference = factor(test_set$quality, levels = c(3,4,5,6,7,8,9)))
-cm_lm_model$overall["Accuracy"]
 # Compute RMSE
 RMSE_lm <- RMSE(test_set$quality, quality_pred_lm)
 RMSE_lm
+# Compute confusion matrix
+quality_pred_lm <- round(quality_pred_lm) ## I need to round to the nearest value (integer)
+cm_lm_model <- confusionMatrix(data = factor(quality_pred_lm, levels = c(3,4,5,6,7,8,9)), 
+                reference = factor(test_set$quality, levels = c(3,4,5,6,7,8,9)))
+cm_lm_model$overall["Accuracy"]
 
 #############################
-# Glm model
+# (Generalized) linear model
 #############################
 # I compute a glm model using all measure values as predictors and quality as outcome.
 glm_model <- train(quality ~ ., data=train_set, method="glm")
 summary(glm_model) 
 quality_pred_glm <- predict(glm_model, test_set) 
-quality_pred_glm <- round(quality_pred_glm)
-# Compute confusion matrix
-cm_glm_model <- confusionMatrix(data = factor(quality_pred_glm, levels = c(3,4,5,6,7,8,9)),
-                reference= factor(test_set$quality, levels = c(3,4,5,6,7,8,9)))
-cm_glm_model$overall["Accuracy"]
 # Compute RMSE
 RMSE_glm <- RMSE(test_set$quality, quality_pred_glm)
 RMSE_glm
+# Compute confusion matrix
+quality_pred_glm <- round(quality_pred_glm)
+cm_glm_model <- confusionMatrix(data = factor(quality_pred_glm, levels = c(3,4,5,6,7,8,9)),
+                reference= factor(test_set$quality, levels = c(3,4,5,6,7,8,9)))
+cm_glm_model$overall["Accuracy"]
 
 #############################
 # KNN model
@@ -227,15 +227,15 @@ RMSE_glm
 knn_model <- train(quality ~. , data = train_set, method = "knn")
 summary(knn_model)
 quality_pred_knn <- predict(knn_model, test_set, type = "raw") 
-quality_pred_knn <- round(quality_pred_knn)
+# Compute RMSE
+RMSE_knn <- RMSE(test_set$quality, quality_pred_knn)
+RMSE_knn
 # Compute confusion matrix
+quality_pred_knn <- round(quality_pred_knn)
 cm_knn_model <- confusionMatrix(data = factor(quality_pred_knn, levels = c(3,4,5,6,7,8,9)),
                 reference= factor(test_set$quality, levels = c(3,4,5,6,7,8,9)))
 cm_knn_model$overall["Accuracy"]
 ggplot(knn_model, highlight = TRUE)
-# Compute RMSE
-RMSE_knn <- RMSE(test_set$quality, quality_pred_knn)
-RMSE_knn
 
 #############################
 # Decision tree model
@@ -244,15 +244,15 @@ RMSE_knn
 rpart_model <- rpart(quality ~ ., data=train_set)
 summary(rpart_model)
 quality_pred_rpart <- predict(rpart_model, test_set)
-quality_pred_rpart <- round(quality_pred_rpart)
+# Compute RMSE
+RMSE_rpart <- RMSE(test_set$quality, quality_pred_rpart)
+RMSE_rpart
 # Compute confusion matrix
+quality_pred_rpart <- round(quality_pred_rpart)
 cm_rpart_model <- confusionMatrix(data = factor(quality_pred_rpart, levels = c(3,4,5,6,7,8,9)),
                 reference= factor(test_set$quality, levels = c(3,4,5,6,7,8,9)))
 cm_rpart_model$overall["Accuracy"]
 rpart.plot(rpart_model)
-# Compute RMSE
-RMSE_rpart <- RMSE(test_set$quality, quality_pred_rpart)
-RMSE_rpart
 
 #############################
 # Random forest model
@@ -261,15 +261,43 @@ RMSE_rpart
 randomForest_model <- randomForest(quality ~ ., data=train_set)
 summary(randomForest_model)
 quality_pred_randomForest <- predict(randomForest_model, test_set)
-quality_pred_randomForest <- round(quality_pred_randomForest)
+# Compute RMSE
+RMSE_randomForest <- RMSE(test_set$quality, quality_pred_randomForest)
+RMSE_randomForest
 # Compute confusion matrix
+quality_pred_randomForest <- round(quality_pred_randomForest)
 cm_randomForest_model <- confusionMatrix(data = factor(quality_pred_randomForest, levels = c(3,4,5,6,7,8,9)),
                       reference= factor(test_set$quality, levels = c(3,4,5,6,7,8,9)))
 cm_randomForest_model$overall["Accuracy"]
 plot(randomForest_model)
-# Compute RMSE
-RMSE_randomForest <- RMSE(test_set$quality, quality_pred_randomForest)
-RMSE_randomForest
+
+# RF tuning
+# The RF optimization leads to slightly improved model performance, but it takes very long to run,
+# even with very small values for ntree and nSamp. Therefore I commented it out in my code. In theory
+# further optimisation potentials are available.
+# Model tuning
+# control <- trainControl(method="cv", number = 5)
+# grid <- data.frame(mtry = c(1:11))
+# train_rf <-  train(quality ~ ., 
+#                    method = "rf", 
+#                    ntree = 150,
+#                    trControl = control,
+#                    tuneGrid = grid,
+#                    nSamp = 100,
+#                    data=train_set)
+# randomForest_model_opt <- randomForest(quality ~ ., 
+#                        minNode = train_rf$bestTune$mtry,
+#                        data=train_set)
+# # Fit optimised model
+# quality_pred_randomForest_opt <- predict(fit_rf, test_set)
+# # Compute RMSE
+# RMSE_randomForest_opt <- RMSE(test_set$quality, quality_pred_randomForest)
+# RMSE_randomForest_opt
+# # Compute confusion matrix
+# quality_pred_randomForest_opt <- round(quality_pred_randomForest)
+# cm_randomForest_model_opt <- confusionMatrix(data = factor(quality_pred_randomForest, levels = c(3,4,5,6,7,8,9)),
+#                                          reference= factor(test_set$quality, levels = c(3,4,5,6,7,8,9)))
+# cm_randomForest_model_opt$overall["Accuracy"]
 
 #############################
 # SVM model
@@ -277,15 +305,16 @@ RMSE_randomForest
 # I compute a SVM model using all measure values as predictors and quality as outcome.
 svm_model <- svm(quality ~ ., data=train_set)
 quality_pred_svm <- predict(svm_model, test_set)
-quality_pred_svm <- round(quality_pred_svm)
-summary(svm_model)
-# Compute confusion matrix
-cm_svm_model <- confusionMatrix(data = factor(quality_pred_svm, levels = c(3,4,5,6,7,8,9)),
-                reference= factor(test_set$quality, levels = c(3,4,5,6,7,8,9)))
-cm_svm_model$overall["Accuracy"]
 # Compute RMSE
 RMSE_svm <- RMSE(test_set$quality, quality_pred_svm)
 RMSE_svm
+# Compute confusion matrix
+quality_pred_svm <- round(quality_pred_svm)
+summary(svm_model)
+cm_svm_model <- confusionMatrix(data = factor(quality_pred_svm, levels = c(3,4,5,6,7,8,9)),
+                reference= factor(test_set$quality, levels = c(3,4,5,6,7,8,9)))
+cm_svm_model$overall["Accuracy"]
+
 
 ##########################################################################
 ##
@@ -295,9 +324,9 @@ RMSE_svm
 
 # I build a results dataframe for all models evaluated based on accuracy
 acc_results <- data.frame(
-  Method=c("Mean model", 
-           "Lm model", 
-           "Glm model", 
+  Method=c("Median model", 
+           "Linear model", 
+           "Generalized Linar model", 
            "KNN model",
            "Decision Tree model",
            "Random Forest model",
@@ -315,9 +344,9 @@ acc_results %>% arrange(desc(Accuracy))
 
 # I build another results dataframe for all models evaluated based on RMSE score
 RMSE_results <- data.frame(
-  Method=c("Mean model", 
-           "Lm model", 
-           "Glm model", 
+  Method=c("Median model", 
+           "Linear model", 
+           "Generalized linear model", 
            "KNN model",
            "Decision Tree model",
            "Random Forest model",
